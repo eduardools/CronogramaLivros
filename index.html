@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Produção (Supabase)</title>
     <style>
-        /* O CSS é exatamente o mesmo, não precisa mudar nada */
         body { font-family: system-ui, sans-serif; background-color: #f4f4f4; color: #333; margin: 20px; }
         .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.05); }
         .month-section { margin-bottom: 50px; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
@@ -35,27 +34,22 @@
     <h1 style="text-align:center; color: #888;">Carregando dados...</h1>
 </div>
 
-<!-- SDK do Supabase -->
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = 'https://hbosqimgzebptgjomhfw.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhib3NxaW1nemVicHRnam9taGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMTAzMDEsImV4cCI6MjA3MDY4NjMwMX0.Br2FnNQbvc94Vph1KvDY3NRGBoNxhI7QQT9dJuDDiME';
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Agora usamos "client" para não sobrescrever o objeto importado
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const mainContainer = document.getElementById('main-container');
-
-    // --- FUNÇÕES DE RENDERIZAÇÃO DA INTERFACE ---
 
     function renderAll(tasks) {
         mainContainer.innerHTML = '';
         const tasksByMonth = {};
 
-        // Agrupa as tarefas por mês
         tasks.forEach(task => {
-            const month = task.month; // Ex: "2024-08"
+            const month = task.month;
             if (!month) return; 
-
             if (!tasksByMonth[month]) {
                 tasksByMonth[month] = { denominacional: [], infantojuvenil: [] };
             }
@@ -63,8 +57,6 @@
         });
 
         const sortedMonths = Object.keys(tasksByMonth).sort().reverse();
-
-        // Garante que o mês atual sempre apareça, mesmo que vazio
         const currentMonthKey = formatMonth(new Date());
         if (!sortedMonths.includes(currentMonthKey)) {
             sortedMonths.unshift(currentMonthKey);
@@ -89,116 +81,15 @@
         section.className = 'month-section';
         section.innerHTML = `
             <div class="month-header">${displayDate}</div>
-            
             <div class="category-header">Denominacional / Acadêmicos</div>
             <table>
                 <thead><tr><th style="width: 15%;">Tipo</th><th style="width: 25%;">Título</th><th class="checkbox-cell" style="width: 5%;">S1</th><th class="checkbox-cell" style="width: 5%;">S2</th><th class="checkbox-cell" style="width: 5%;">S3</th><th class="checkbox-cell" style="width: 5%;">S4</th><th style="width: 35%;">Observações</th><th style="width: 5%;"></th></tr></thead>
                 <tbody>${generateTableRows(tasks.denominacional)}</tbody>
             </table>
             ${createAddItemForm('denominacional', monthKey)}
-
             <div class="category-header" style="margin-top: 40px;">Infantojuvenil</div>
             <table>
                 <thead><tr><th style="width: 15%;">Tipo</th><th style="width: 25%;">Título</th><th class="checkbox-cell" style="width: 5%;">S1</th><th class="checkbox-cell" style="width: 5%;">S2</th><th class="checkbox-cell" style="width: 5%;">S3</th><th class="checkbox-cell" style="width: 5%;">S4</th><th style="width: 35%;">Observações</th><th style="width: 5%;"></th></tr></thead>
                 <tbody>${generateTableRows(tasks.infantojuvenil)}</tbody>
             </table>
-            ${createAddItemForm('infantojuvenil', monthKey)}
-        `;
-        mainContainer.appendChild(section);
-    }
-    
-    function generateTableRows(tasks) {
-        if (!tasks || tasks.length === 0) return '<tr><td colspan="8" style="text-align:center; color:#999;">Nenhuma tarefa nesta categoria.</td></tr>';
-        return tasks.map(task => `
-            <tr data-id="${task.id}">
-                <td><span class="task-type ${task.type}">${task.typeText}</span></td>
-                <td>${task.title}</td>
-                <td class="checkbox-cell"><input type="checkbox" onchange="updateTask(${task.id}, 's1', this.checked)" ${task.s1 ? 'checked' : ''}></td>
-                <td class="checkbox-cell"><input type="checkbox" onchange="updateTask(${task.id}, 's2', this.checked)" ${task.s2 ? 'checked' : ''}></td>
-                <td class="checkbox-cell"><input type="checkbox" onchange="updateTask(${task.id}, 's3', this.checked)" ${task.s3 ? 'checked' : ''}></td>
-                <td class="checkbox-cell"><input type="checkbox" onchange="updateTask(${task.id}, 's4', this.checked)" ${task.s4 ? 'checked' : ''}></td>
-                <td><input type="text" class="obs-input" onchange="updateTask(${task.id}, 'observations', this.value)" value="${task.observations || ''}"></td>
-                <td><button class="delete-btn" onclick="deleteTask(${task.id})">X</button></td>
-            </tr>
-        `).join('');
-    }
-
-    function createAddItemForm(category, monthKey) {
-        const typeOptions = {
-            denominacional: `<option value="briefing">Briefing</option><option value="texto-arte">Texto → Arte</option><option value="saida-arte">Saída Arte</option><option value="p2-arte">P2 Arte</option><option value="p3-arte">P3 Arte</option>`,
-            infantojuvenil: `<option value="texto-arte">Texto → Arte</option><option value="saida-arte">Saída Arte</option><option value="p2-arte">P2 Arte</option>`
-        };
-        return `
-            <div id="form-${category}-${monthKey}" class="add-item-form">
-                <select class="task-type-select">${typeOptions[category]}</select>
-                <input type="text" class="task-title-input" placeholder="Digite o título da tarefa">
-                <button onclick="addItem('${category}', '${monthKey}')">Adicionar Item</button>
-            </div>`;
-    }
-
-    // --- FUNÇÕES DE INTERAÇÃO COM O BANCO DE DADOS ---
-
-    async function addItem(category, monthKey) {
-        const form = document.getElementById(`form-${category}-${monthKey}`);
-        const typeSelect = form.querySelector('.task-type-select');
-        const titleInput = form.querySelector('.task-title-input');
-        
-        if (!titleInput.value) { alert('Por favor, insira um título.'); return; }
-
-        const { error } = await supabase.from('tasks').insert({
-            month: monthKey, // AQUI ESTÁ A MÁGICA
-            category: category,
-            type: typeSelect.value,
-            typeText: typeSelect.options[typeSelect.selectedIndex].text,
-            title: titleInput.value,
-            observations: ""
-        });
-        if (error) console.error("Erro ao adicionar item:", error);
-    }
-
-    async function updateTask(taskId, field, value) {
-        const updateData = { [field]: value };
-        const { error } = await supabase.from('tasks').update(updateData).eq('id', taskId);
-        if (error) console.error("Erro ao atualizar:", error);
-    }
-
-    async function deleteTask(taskId) {
-        if (confirm('Tem certeza que deseja apagar esta tarefa?')) {
-            const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-            if (error) console.error("Erro ao deletar:", error);
-        }
-    }
-    
-    // --- BUSCA INICIAL E LISTENER EM TEMPO REAL ---
-
-    async function fetchAndRenderInitialData() {
-        const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-        if (error) {
-            mainContainer.innerHTML = '<h1>Erro ao carregar dados. Verifique o console.</h1>';
-            console.error(error);
-        } else {
-            renderAll(data);
-        }
-    }
-
-    // Ouve mudanças na tabela 'tasks' e redesenha tudo
-    supabase.channel('tasks-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-        console.log('Mudança recebida!', payload);
-        fetchAndRenderInitialData(); // Simplesmente busca todos os dados novamente e redesenha
-      })
-      .subscribe();
-      
-    // --- FUNÇÕES UTILITÁRIAS ---
-    function formatMonth(date) {
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        return `${year}-${month}`; // Retorna "YYYY-MM"
-    }
-    
-    // Carrega os dados pela primeira vez ao abrir a página
-    fetchAndRenderInitialData();
-</script>
-
-</body>
-</html>
+            ${createAddItemForm('infanto
