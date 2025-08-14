@@ -171,230 +171,267 @@
     <button id="toggle-done-months" onclick="toggleDoneMonths()">Ocultar meses concluídos</button>
     <div id="months-root"></div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // --- Dados e utilitários ---
-    const monthsData = [];
+const SUPABASE_URL = 'https://hbosqimgzebptgjomhfw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhib3NxaW1nemVicHRnam9taGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMTAzMDEsImV4cCI6MjA3MDY4NjMwMX0.Br2FnNQbvc94Vph1KvDY3NRGBoNxhI7QQT9dJuDDiME';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Dados demonstrativos
-    const demoMonthKey = getMonthKey(new Date());
-    monthsData.push({
-        key: demoMonthKey,
-        label: getMonthLabel(demoMonthKey),
-        hidden: false,
-        done: false,
+let monthsData = [];
+let hideConcluded = false;
+
+function getMonthLabel(key) {
+    if (!key || !key.includes('-')) return '';
+    const [year, month] = key.split('-');
+    const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const mesIdx = parseInt(month, 10) - 1;
+    if (isNaN(mesIdx) || mesIdx < 0 || mesIdx > 11 || !year) return '';
+    return nomeMes[mesIdx]+' de '+year;
+}
+
+async function loadAll() {
+    // Carrega meses
+    let { data: meses, error: errMeses } = await supabase
+        .from('meses')
+        .select('*')
+        .order('key', {ascending: true});
+    if (errMeses) { alert('Erro ao carregar meses'); return; }
+
+    // Carrega tarefas
+    let { data: tarefas, error: errTarefas } = await supabase
+        .from('tarefas')
+        .select('*');
+    if (errTarefas) { alert('Erro ao carregar tarefas'); return; }
+
+    // Monta estrutura
+    monthsData = meses.map(mes => ({
+        ...mes,
         tasks: {
-            'denominacional': [
-                {typeClass:'briefing', typeText:'Briefing', title:'Praying Like a Crazy for your Husband (Mulher)'},
-                {typeClass:'briefing', typeText:'Briefing', title:'O Atirador Convertido / título'},
-                {typeClass:'texto-arte', typeText:'Texto → Arte', title:'51374 - Noite Feliz'},
-                {typeClass:'saida-arte', typeText:'Saída Arte', title:'41366 - Inigualável'},
-                {typeClass:'p2-arte', typeText:'P2 Arte', title:'41366 - Visões do Futuro'},
-                {typeClass:'p3-arte', typeText:'P3 Arte', title:'41366 - Inigualável'}
-            ],
-            'infantojuvenil': [
-                {typeClass:'texto-arte', typeText:'Texto → Arte', title:'Detective Zack: Trapped in Darkmoor Manor'},
-                {typeClass:'saida-arte', typeText:'Saída Arte', title:'Carrabicho'},
-                {typeClass:'saida-arte', typeText:'Saída Arte', title:'O óculos da vovó'},
-                {typeClass:'p2-arte', typeText:'P2 Arte', title:'Atualizando o Perfil'}
-            ]
+            denominacional: tarefas.filter(t=>t.mes_id===mes.id && t.categoria==='denominacional'),
+            infantojuvenil: tarefas.filter(t=>t.mes_id===mes.id && t.categoria==='infantojuvenil')
         }
-    });
+    }));
 
-    function getMonthKey(date) {
-        let d = (typeof date === "string") ? new Date(date) : date;
-        if (!d || isNaN(d.getTime())) return '';
-        return d.toISOString().slice(0,7); // yyyy-mm
-    }
-    function getMonthLabel(key) {
-        if (!key || !key.includes('-')) return '';
-        const [year, month] = key.split('-');
-        const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-        const mesIdx = parseInt(month, 10) - 1;
-        if (isNaN(mesIdx) || mesIdx < 0 || mesIdx > 11 || !year) return '';
-        return nomeMes[mesIdx]+' de '+year;
-    }
-
-    // --- Renderização de todos os meses ---
-    let hideConcluded = false;
-    function renderMonths() {
-        const root = document.getElementById('months-root');
-        root.innerHTML = '';
-        monthsData.forEach((month, mIdx) => {
-            if (hideConcluded && month.done) return;
-            root.appendChild(renderMonthSection(month, mIdx));
-        });
-    }
-
-    // --- Renderização de um mês ---
-    function renderMonthSection(month, idx) {
-        const section = document.createElement('div');
-        section.className = 'month-section' + (month.done ? ' concluded' : '');
-        section.dataset.idx = idx;
-        // Cabeçalho com botões
-        const header = document.createElement('div');
-        header.innerHTML = `
-            <span style="font-size:1.3em; font-weight:bold; color:#e67e22;">${month.label}</span>
-            <button class="hide-btn" onclick="toggleMonthHidden(${idx})">${month.hidden ? 'Mostrar mês' : 'Ocultar mês'}</button>
-            <button class="done-btn${month.done ? ' done' : ''}" onclick="toggleMonthDone(${idx})">${month.done ? 'Desmarcar concluído' : 'Concluído'}</button>
-        `;
-        section.appendChild(header);
-
-        const content = document.createElement('div');
-        content.className = month.hidden ? 'hidden' : '';
-        content.innerHTML = `
-            <div class="category-header">Denominacional / Acadêmicos</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Tipo</th>
-                        <th style="width: 30%;">Título</th>
-                        <th style="width: 5%; text-align:center;">S1</th>
-                        <th style="width: 5%; text-align:center;">S2</th>
-                        <th style="width: 5%; text-align:center;">S3</th>
-                        <th style="width: 5%; text-align:center;">S4</th>
-                        <th style="width: 35%;">Observações</th>
-                        <th style="width: 5%;">&nbsp;</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-denominacional-${idx}">
-                    ${month.tasks.denominacional.map((task,i)=>rowHTML(idx,'denominacional',i,task)).join('')}
-                </tbody>
-            </table>
-            ${addFormHTML(idx,'denominacional')}
-            <div class="category-header" style="margin-top: 40px;">Infantojuvenil</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Tipo</th>
-                        <th style="width: 30%;">Título</th>
-                        <th style="width: 5%; text-align:center;">S1</th>
-                        <th style="width: 5%; text-align:center;">S2</th>
-                        <th style="width: 5%; text-align:center;">S3</th>
-                        <th style="width: 5%; text-align:center;">S4</th>
-                        <th style="width: 35%;">Observações</th>
-                        <th style="width: 5%;">&nbsp;</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-infantojuvenil-${idx}">
-                    ${month.tasks.infantojuvenil.map((task,i)=>rowHTML(idx,'infantojuvenil',i,task)).join('')}
-                </tbody>
-            </table>
-            ${addFormHTML(idx,'infantojuvenil')}
-        `;
-        section.appendChild(content);
-
-        return section;
-    }
-
-    // --- Funções de manipulação ---
-    function addNewMonth() {
-        const input = document.getElementById('input-new-month');
-        const val = input.value.trim();
-        if (!val || !/^\d{4}-\d{2}$/.test(val)) {
-            alert('Digite o mês no formato YYYY-MM (ex: 2025-09)');
-            input.focus();
-            return;
-        }
-        if (monthsData.some(m => m.key === val)) {
-            alert('Esse mês já existe!');
-            input.focus();
-            return;
-        }
-        monthsData.push({
-            key: val,
-            label: getMonthLabel(val),
-            hidden: false,
-            done: false,
-            tasks: {denominacional:[], infantojuvenil:[]}
-        });
-        input.value = '';
-        renderMonths();
-        window.scrollTo(0, document.body.scrollHeight);
-    }
-
-    function addItem(monthIdx, category) {
-        const form = document.getElementById(`form-${category}-${monthIdx}`);
-        const typeSelect = form.querySelector('.task-type-select');
-        const titleInput = form.querySelector('.task-title-input');
-        const taskType = typeSelect.value;
-        const taskTypeText = typeSelect.options[typeSelect.selectedIndex].text;
-        const taskTitle = titleInput.value.trim();
-        if (!taskTitle) { alert('Por favor, insira um título para a tarefa.'); return; }
-        monthsData[monthIdx].tasks[category].push({
-            typeClass: taskType,
-            typeText: taskTypeText,
-            title: taskTitle,
-            s1: false, s2: false, s3: false, s4: false, obs: ""
-        });
-        renderMonths();
-    }
-
-    function deleteRow(monthIdx, category, idx) {
-        if (confirm('Deseja excluir este item?')) {
-            monthsData[monthIdx].tasks[category].splice(idx,1);
-            renderMonths();
-        }
-    }
-
-    function toggleMonthHidden(idx) {
-        monthsData[idx].hidden = !monthsData[idx].hidden;
-        renderMonths();
-    }
-
-    function toggleMonthDone(idx) {
-        monthsData[idx].done = !monthsData[idx].done;
-        renderMonths();
-    }
-
-    function toggleDoneMonths() {
-        hideConcluded = !hideConcluded;
-        document.getElementById('toggle-done-months').innerText = hideConcluded ? 'Mostrar meses concluídos' : 'Ocultar meses concluídos';
-        renderMonths();
-    }
-
-    // --- HTML helpers ---
-    // SVG do ícone de lixeira
-    const trashSVG = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-            <path d="M10 11v6"></path>
-            <path d="M14 11v6"></path>
-            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
-        </svg>`;
-
-    function rowHTML(monthIdx, category, idx, task) {
-        return `
-        <tr>
-            <td><span class="task-type ${task.typeClass}">${task.typeText}</span></td>
-            <td>${task.title}</td>
-            <td class="checkbox-cell"><input type="checkbox" ${task.s1?'checked':''}></td>
-            <td class="checkbox-cell"><input type="checkbox" ${task.s2?'checked':''}></td>
-            <td class="checkbox-cell"><input type="checkbox" ${task.s3?'checked':''}></td>
-            <td class="checkbox-cell"><input type="checkbox" ${task.s4?'checked':''}></td>
-            <td><input type="text" class="obs-input" value="${task.obs||''}" placeholder="Adicione uma nota..."></td>
-            <td><button class="delete-btn" title="Excluir item" onclick="deleteRow(${monthIdx},'${category}',${idx})">${trashSVG}</button></td>
-        </tr>
-        `;
-    }
-
-    function addFormHTML(monthIdx, category) {
-        let options = `<option value="briefing">Briefing</option>
-            <option value="texto-arte">Texto → Arte</option>
-            <option value="saida-arte">Saída Arte</option>
-            <option value="p2-arte">P2 Arte</option>`;
-        if (category === 'denominacional') options += `<option value="p3-arte">P3 Arte</option>`;
-        return `
-        <div class="add-item-form" id="form-${category}-${monthIdx}">
-            <select class="task-type-select">${options}</select>
-            <input type="text" class="task-title-input" placeholder="Digite o título da tarefa">
-            <button onclick="addItem(${monthIdx},'${category}')" type="button">Adicionar Item</button>
-        </div>`;
-    }
-
-    // --- Inicialização ---
     renderMonths();
+}
+
+function renderMonths() {
+    const root = document.getElementById('months-root');
+    root.innerHTML = '';
+    monthsData.forEach((month, mIdx) => {
+        if (hideConcluded && month.done) return;
+        root.appendChild(renderMonthSection(month, mIdx));
+    });
+}
+
+function renderMonthSection(month, idx) {
+    const section = document.createElement('div');
+    section.className = 'month-section' + (month.done ? ' concluded' : '');
+    section.dataset.idx = idx;
+    // Cabeçalho com botões
+    const header = document.createElement('div');
+    header.innerHTML = `
+        <span style="font-size:1.3em; font-weight:bold; color:#e67e22;">${month.label}</span>
+        <button class="hide-btn" onclick="toggleMonthHidden('${month.id}', ${idx})">${month.hidden ? 'Mostrar mês' : 'Ocultar mês'}</button>
+        <button class="done-btn${month.done ? ' done' : ''}" onclick="toggleMonthDone('${month.id}', ${idx})">${month.done ? 'Desmarcar concluído' : 'Concluído'}</button>
+    `;
+    section.appendChild(header);
+
+    const content = document.createElement('div');
+    content.className = month.hidden ? 'hidden' : '';
+    content.innerHTML = `
+        <div class="category-header">Denominacional / Acadêmicos</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Tipo</th>
+                    <th style="width: 30%;">Título</th>
+                    <th style="width: 5%; text-align:center;">S1</th>
+                    <th style="width: 5%; text-align:center;">S2</th>
+                    <th style="width: 5%; text-align:center;">S3</th>
+                    <th style="width: 5%; text-align:center;">S4</th>
+                    <th style="width: 35%;">Observações</th>
+                    <th style="width: 5%;">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-denominacional-${idx}">
+                ${month.tasks.denominacional.map((task,i)=>rowHTML(month.id,idx,'denominacional',i,task)).join('')}
+            </tbody>
+        </table>
+        ${addFormHTML(idx,'denominacional')}
+        <div class="category-header" style="margin-top: 40px;">Infantojuvenil</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Tipo</th>
+                    <th style="width: 30%;">Título</th>
+                    <th style="width: 5%; text-align:center;">S1</th>
+                    <th style="width: 5%; text-align:center;">S2</th>
+                    <th style="width: 5%; text-align:center;">S3</th>
+                    <th style="width: 5%; text-align:center;">S4</th>
+                    <th style="width: 35%;">Observações</th>
+                    <th style="width: 5%;">&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-infantojuvenil-${idx}">
+                ${month.tasks.infantojuvenil.map((task,i)=>rowHTML(month.id,idx,'infantojuvenil',i,task)).join('')}
+            </tbody>
+        </table>
+        ${addFormHTML(idx,'infantojuvenil')}
+    `;
+    section.appendChild(content);
+
+    return section;
+}
+
+const trashSVG = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+        <path d="M10 11v6"></path>
+        <path d="M14 11v6"></path>
+        <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+    </svg>`;
+
+function rowHTML(mes_id, monthIdx, category, idx, task) {
+    return `
+    <tr>
+        <td><span class="task-type ${task.tipo}">${task.tipo}</span></td>
+        <td>${task.titulo}</td>
+        <td class="checkbox-cell"><input type="checkbox" ${task.s1?'checked':''} onchange="toggleTaskCheck('${task.id}','s1',this.checked)"></td>
+        <td class="checkbox-cell"><input type="checkbox" ${task.s2?'checked':''} onchange="toggleTaskCheck('${task.id}','s2',this.checked)"></td>
+        <td class="checkbox-cell"><input type="checkbox" ${task.s3?'checked':''} onchange="toggleTaskCheck('${task.id}','s3',this.checked)"></td>
+        <td class="checkbox-cell"><input type="checkbox" ${task.s4?'checked':''} onchange="toggleTaskCheck('${task.id}','s4',this.checked)"></td>
+        <td><input type="text" class="obs-input" value="${task.obs||''}" placeholder="Adicione uma nota..." onchange="updateTaskObs('${task.id}',this.value)"></td>
+        <td><button class="delete-btn" title="Excluir item" onclick="deleteRow('${task.id}')">${trashSVG}</button></td>
+    </tr>
+    `;
+}
+
+function addFormHTML(monthIdx, category) {
+    let options = `<option value="briefing">Briefing</option>
+        <option value="texto-arte">Texto → Arte</option>
+        <option value="saida-arte">Saída Arte</option>
+        <option value="p2-arte">P2 Arte</option>`;
+    if (category === 'denominacional') options += `<option value="p3-arte">P3 Arte</option>`;
+    return `
+    <div class="add-item-form" id="form-${category}-${monthIdx}">
+        <select class="task-type-select">${options}</select>
+        <input type="text" class="task-title-input" placeholder="Digite o título da tarefa">
+        <button onclick="addItem(${monthIdx},'${category}')" type="button">Adicionar Item</button>
+    </div>`;
+}
+
+async function addNewMonth() {
+    const input = document.getElementById('input-new-month');
+    const val = input.value.trim();
+    if (!val || !/^\d{4}-\d{2}$/.test(val)) {
+        alert('Digite o mês no formato YYYY-MM (ex: 2025-09)');
+        input.focus();
+        return;
+    }
+    if (monthsData.some(m => m.key === val)) {
+        alert('Esse mês já existe!');
+        input.focus();
+        return;
+    }
+    const label = getMonthLabel(val);
+    let { data, error } = await supabase
+        .from('meses')
+        .insert([{ key: val, label }]);
+    if (error) {
+        alert('Erro ao criar mês');
+        return;
+    }
+    input.value = '';
+    await loadAll();
+    window.scrollTo(0, document.body.scrollHeight);
+}
+
+async function addItem(monthIdx, category) {
+    const form = document.getElementById(`form-${category}-${monthIdx}`);
+    const typeSelect = form.querySelector('.task-type-select');
+    const titleInput = form.querySelector('.task-title-input');
+    const taskType = typeSelect.value;
+    const taskTitle = titleInput.value.trim();
+    if (!taskTitle) { alert('Por favor, insira um título para a tarefa.'); return; }
+    let { error } = await supabase
+        .from('tarefas')
+        .insert([{
+            mes_id: monthsData[monthIdx].id,
+            categoria: category,
+            tipo: taskType,
+            titulo: taskTitle
+        }]);
+    if (error) {
+        alert('Erro ao adicionar tarefa');
+        return;
+    }
+    await loadAll();
+}
+
+async function deleteRow(taskId) {
+    if (!confirm('Deseja excluir este item?')) return;
+    let { error } = await supabase
+        .from('tarefas')
+        .delete()
+        .eq('id', taskId);
+    if (error) {
+        alert('Erro ao excluir tarefa');
+        return;
+    }
+    await loadAll();
+}
+
+async function toggleTaskCheck(taskId, field, checked) {
+    let { error } = await supabase
+        .from('tarefas')
+        .update({ [field]: checked })
+        .eq('id', taskId);
+    if (error) alert('Erro ao atualizar tarefa');
+}
+
+async function updateTaskObs(taskId, obs) {
+    let { error } = await supabase
+        .from('tarefas')
+        .update({ obs })
+        .eq('id', taskId);
+    if (error) alert('Erro ao atualizar observação');
+}
+
+async function toggleMonthHidden(mes_id, idx) {
+    let month = monthsData[idx];
+    let { error } = await supabase
+        .from('meses')
+        .update({ hidden: !month.hidden })
+        .eq('id', mes_id);
+    if (error) alert('Erro ao atualizar mês');
+    await loadAll();
+}
+async function toggleMonthDone(mes_id, idx) {
+    let month = monthsData[idx];
+    let { error } = await supabase
+        .from('meses')
+        .update({ done: !month.done })
+        .eq('id', mes_id);
+    if (error) alert('Erro ao atualizar mês');
+    await loadAll();
+}
+function toggleDoneMonths() {
+    hideConcluded = !hideConcluded;
+    document.getElementById('toggle-done-months').innerText = hideConcluded ? 'Mostrar meses concluídos' : 'Ocultar meses concluídos';
+    renderMonths();
+}
+
+window.toggleTaskCheck = toggleTaskCheck;
+window.updateTaskObs = updateTaskObs;
+window.deleteRow = deleteRow;
+window.toggleMonthHidden = toggleMonthHidden;
+window.toggleMonthDone = toggleMonthDone;
+
+loadAll();
 </script>
 </body>
 </html>
