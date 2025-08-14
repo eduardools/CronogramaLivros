@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário de Acompanhamento Interativo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+        }
+        .month-section {
+            margin-bottom: 50px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fff;
+            position: relative;
+        }
+        .category-header {
+            background-color: #f0c99a;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .task-type {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            color: white;
+            min-width: 100px;
+            text-align: center;
+        }
+        .task-type.briefing { background-color: #d8d3b8; color: #555;}
+        .task-type.texto-arte { background-color: #83919b; }
+        .task-type.saida-arte { background-color: #4f5a65; }
+        .task-type.p2-arte { background-color: #ffc107; }
+        .task-type.p3-arte { background-color: #f57c00; }
+        .checkbox-cell { text-align: center; }
+        input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
+        input[type="text"].obs-input {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .add-item-form {
+            padding: 20px;
+            background-color: #fafafa;
+            border: 1px dashed #ccc;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .add-item-form select, .add-item-form input, .add-item-form button {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .add-item-form button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .add-item-form button:hover { background-color: #218838; }
+        .month-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 1.2em;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        .delete-btn svg {
+            width: 18px; height: 18px; display:block;
+        }
+        .delete-btn:hover { background: #b91c1c; }
+        .hide-btn, .done-btn {
+            margin-left: 8px;
+            background: #eee;
+            color: #666;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .hide-btn:hover { background: #ccc; }
+        .done-btn {
+            background: #0a7c2e;
+            color: #fff;
+        }
+        .done-btn.done { background: #888; }
+        .hidden { display: none; }
+        .month-section.concluded { opacity: 0.5; }
+        #toggle-done-months {
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #888;
+            color: #fff;
+            border-radius: 7px;
+            border: none;
+            cursor: pointer;
+        }
+        #toggle-done-months:hover { background: #555; }
+        #input-new-month {
+            width: 120px;
+            font-size: 1em;
+            font-family: inherit;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 8px 12px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        #input-new-month:focus { border-color: #e67e22; outline: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="month-bar">
+        <label><b>Adicionar novo mês:</b></label>
+        <input type="text" id="input-new-month" placeholder="YYYY-MM" maxlength="7" pattern="\d{4}-\d{2}">
+        <button onclick="addNewMonth()">Adicionar mês</button>
+    </div>
+    <button id="toggle-done-months" onclick="toggleDoneMonths()">Ocultar meses concluídos</button>
+    <div id="months-root"></div>
+</div>
+<script>
+    // --- Dados e utilitários ---
+    const monthsData = [];
+
+    // Dados demonstrativos
+    const demoMonthKey = getMonthKey(new Date());
+    monthsData.push({
+        key: demoMonthKey,
+        label: getMonthLabel(demoMonthKey),
+        hidden: false,
+        done: false,
+        tasks: {
+            'denominacional': [
+                {typeClass:'briefing', typeText:'Briefing', title:'Praying Like a Crazy for your Husband (Mulher)'},
+                {typeClass:'briefing', typeText:'Briefing', title:'O Atirador Convertido / título'},
+                {typeClass:'texto-arte', typeText:'Texto → Arte', title:'51374 - Noite Feliz'},
+                {typeClass:'saida-arte', typeText:'Saída Arte', title:'41366 - Inigualável'},
+                {typeClass:'p2-arte', typeText:'P2 Arte', title:'41366 - Visões do Futuro'},
+                {typeClass:'p3-arte', typeText:'P3 Arte', title:'41366 - Inigualável'}
+            ],
+            'infantojuvenil': [
+                {typeClass:'texto-arte', typeText:'Texto → Arte', title:'Detective Zack: Trapped in Darkmoor Manor'},
+                {typeClass:'saida-arte', typeText:'Saída Arte', title:'Carrabicho'},
+                {typeClass:'saida-arte', typeText:'Saída Arte', title:'O óculos da vovó'},
+                {typeClass:'p2-arte', typeText:'P2 Arte', title:'Atualizando o Perfil'}
+            ]
+        }
+    });
+
+    function getMonthKey(date) {
+        let d = (typeof date === "string") ? new Date(date) : date;
+        if (!d || isNaN(d.getTime())) return '';
+        return d.toISOString().slice(0,7); // yyyy-mm
+    }
+    function getMonthLabel(key) {
+        if (!key || !key.includes('-')) return '';
+        const [year, month] = key.split('-');
+        const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const mesIdx = parseInt(month, 10) - 1;
+        if (isNaN(mesIdx) || mesIdx < 0 || mesIdx > 11 || !year) return '';
+        return nomeMes[mesIdx]+' de '+year;
+    }
+
+    // --- Renderização de todos os meses ---
+    let hideConcluded = false;
+    function renderMonths() {
+        const root = document.getElementById('months-root');
+        root.innerHTML = '';
+        monthsData.forEach((month, mIdx) => {
+            if (hideConcluded && month.done) return;
+            root.appendChild(renderMonthSection(month, mIdx));
+        });
+    }
+
+    // --- Renderização de um mês ---
+    function renderMonthSection(month, idx) {
+        const section = document.createElement('div');
+        section.className = 'month-section' + (month.done ? ' concluded' : '');
+        section.dataset.idx = idx;
+        // Cabeçalho com botões
+        const header = document.createElement('div');
+        header.innerHTML = `
+            <span style="font-size:1.3em; font-weight:bold; color:#e67e22;">${month.label}</span>
+            <button class="hide-btn" onclick="toggleMonthHidden(${idx})">${month.hidden ? 'Mostrar mês' : 'Ocultar mês'}</button>
+            <button class="done-btn${month.done ? ' done' : ''}" onclick="toggleMonthDone(${idx})">${month.done ? 'Desmarcar concluído' : 'Concluído'}</button>
+        `;
+        section.appendChild(header);
+
+        const content = document.createElement('div');
+        content.className = month.hidden ? 'hidden' : '';
+        content.innerHTML = `
+            <div class="category-header">Denominacional / Acadêmicos</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Tipo</th>
+                        <th style="width: 30%;">Título</th>
+                        <th style="width: 5%; text-align:center;">S1</th>
+                        <th style="width: 5%; text-align:center;">S2</th>
+                        <th style="width: 5%; text-align:center;">S3</th>
+                        <th style="width: 5%; text-align:center;">S4</th>
+                        <th style="width: 35%;">Observações</th>
+                        <th style="width: 5%;">&nbsp;</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-denominacional-${idx}">
+                    ${month.tasks.denominacional.map((task,i)=>rowHTML(idx,'denominacional',i,task)).join('')}
+                </tbody>
+            </table>
+            ${addFormHTML(idx,'denominacional')}
+            <div class="category-header" style="margin-top: 40px;">Infantojuvenil</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Tipo</th>
+                        <th style="width: 30%;">Título</th>
+                        <th style="width: 5%; text-align:center;">S1</th>
+                        <th style="width: 5%; text-align:center;">S2</th>
+                        <th style="width: 5%; text-align:center;">S3</th>
+                        <th style="width: 5%; text-align:center;">S4</th>
+                        <th style="width: 35%;">Observações</th>
+                        <th style="width: 5%;">&nbsp;</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-infantojuvenil-${idx}">
+                    ${month.tasks.infantojuvenil.map((task,i)=>rowHTML(idx,'infantojuvenil',i,task)).join('')}
+                </tbody>
+            </table>
+            ${addFormHTML(idx,'infantojuvenil')}
+        `;
+        section.appendChild(content);
+
+        return section;
+    }
+
+    // --- Funções de manipulação ---
+    function addNewMonth() {
+        const input = document.getElementById('input-new-month');
+        const val = input.value.trim();
+        if (!val || !/^\d{4}-\d{2}$/.test(val)) {
+            alert('Digite o mês no formato YYYY-MM (ex: 2025-09)');
+            input.focus();
+            return;
+        }
+        if (monthsData.some(m => m.key === val)) {
+            alert('Esse mês já existe!');
+            input.focus();
+            return;
+        }
+        monthsData.push({
+            key: val,
+            label: getMonthLabel(val),
+            hidden: false,
+            done: false,
+            tasks: {denominacional:[], infantojuvenil:[]}
+        });
+        input.value = '';
+        renderMonths();
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function addItem(monthIdx, category) {
+        const form = document.getElementById(`form-${category}-${monthIdx}`);
+        const typeSelect = form.querySelector('.task-type-select');
+        const titleInput = form.querySelector('.task-title-input');
+        const taskType = typeSelect.value;
+        const taskTypeText = typeSelect.options[typeSelect.selectedIndex].text;
+        const taskTitle = titleInput.value.trim();
+        if (!taskTitle) { alert('Por favor, insira um título para a tarefa.'); return; }
+        monthsData[monthIdx].tasks[category].push({
+            typeClass: taskType,
+            typeText: taskTypeText,
+            title: taskTitle,
+            s1: false, s2: false, s3: false, s4: false, obs: ""
+        });
+        renderMonths();
+    }
+
+    function deleteRow(monthIdx, category, idx) {
+        if (confirm('Deseja excluir este item?')) {
+            monthsData[monthIdx].tasks[category].splice(idx,1);
+            renderMonths();
+        }
+    }
+
+    function toggleMonthHidden(idx) {
+        monthsData[idx].hidden = !monthsData[idx].hidden;
+        renderMonths();
+    }
+
+    function toggleMonthDone(idx) {
+        monthsData[idx].done = !monthsData[idx].done;
+        renderMonths();
+    }
+
+    function toggleDoneMonths() {
+        hideConcluded = !hideConcluded;
+        document.getElementById('toggle-done-months').innerText = hideConcluded ? 'Mostrar meses concluídos' : 'Ocultar meses concluídos';
+        renderMonths();
+    }
+
+    // --- HTML helpers ---
+    // SVG do ícone de lixeira
+    const trashSVG = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+        </svg>`;
+
+    function rowHTML(monthIdx, category, idx, task) {
+        return `
+        <tr>
+            <td><span class="task-type ${task.typeClass}">${task.typeText}</span></td>
+            <td>${task.title}</td>
+            <td class="checkbox-cell"><input type="checkbox" ${task.s1?'checked':''}></td>
+            <td class="checkbox-cell"><input type="checkbox" ${task.s2?'checked':''}></td>
+            <td class="checkbox-cell"><input type="checkbox" ${task.s3?'checked':''}></td>
+            <td class="checkbox-cell"><input type="checkbox" ${task.s4?'checked':''}></td>
+            <td><input type="text" class="obs-input" value="${task.obs||''}" placeholder="Adicione uma nota..."></td>
+            <td><button class="delete-btn" title="Excluir item" onclick="deleteRow(${monthIdx},'${category}',${idx})">${trashSVG}</button></td>
+        </tr>
+        `;
+    }
+
+    function addFormHTML(monthIdx, category) {
+        let options = `<option value="briefing">Briefing</option>
+            <option value="texto-arte">Texto → Arte</option>
+            <option value="saida-arte">Saída Arte</option>
+            <option value="p2-arte">P2 Arte</option>`;
+        if (category === 'denominacional') options += `<option value="p3-arte">P3 Arte</option>`;
+        return `
+        <div class="add-item-form" id="form-${category}-${monthIdx}">
+            <select class="task-type-select">${options}</select>
+            <input type="text" class="task-title-input" placeholder="Digite o título da tarefa">
+            <button onclick="addItem(${monthIdx},'${category}')" type="button">Adicionar Item</button>
+        </div>`;
+    }
+
+    // --- Inicialização ---
+    renderMonths();
+</script>
+</body>
+</html>
